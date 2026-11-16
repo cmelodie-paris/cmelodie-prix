@@ -168,8 +168,8 @@ const bg = c => c+"22";
 const pct = p => Math.round((1-p.now/p.old)*100);
 const eur = n => n.toFixed(2).replace(".",",")+" €";
 
-const cats = ["Tout",...(P.some(p=>p.t==="promo")?["Promo"]:[]),...(P.some(p=>p.t==="baisse")?["Prix en baisse"]:[]),"-30 %",...new Set(P.map(p=>p.cat))];
-let cur = "Tout";
+const cats = ["Tout",...new Set(P.filter(p=>p.t!=="promo").map(p=>p.cat)),...(P.some(p=>p.t==="promo")?["Promo"]:[])];
+let cur = P.some(p=>p.t!=="promo")?"Tout":"Promo";
 const chips = document.getElementById("chips");
 cats.forEach(c=>{const b=document.createElement("button");b.className="chip"+(c===cur?" on":"");b.textContent=c;b.onclick=()=>{cur=c;[...chips.children].forEach(x=>x.classList.toggle("on",x.textContent===c));render()};chips.appendChild(b)});
 
@@ -264,10 +264,10 @@ if(MC) document.getElementById("mcLink").innerHTML=` <a href="${MC}" target="_bl
 let tt; function toast(m){const t=document.getElementById("toast");t.textContent=m;t.classList.add("show");clearTimeout(tt);tt=setTimeout(()=>t.classList.remove("show"),1600)}
 
 function render(){
-  const list = P.filter(p=>p.colors.length&&(cur==="Tout"||(cur==="-30 %"?pct(p)>=30:cur==="Promo"?p.t==="promo":cur==="Prix en baisse"?p.t==="baisse":p.cat===cur)))
-    .sort((a,b)=>(a.t===b.t?0:a.t==="promo"?-1:1)||pct(b)-pct(a) || b.colors.length-a.colors.length || b.total-a.total);
+  const list = P.filter(p=>p.colors.length&&(cur==="Promo"?p.t==="promo":p.t!=="promo"&&(cur==="Tout"||p.cat===cur)))
+    .sort((a,b)=>pct(b)-pct(a) || b.colors.length-a.colors.length || b.total-a.total);
   document.getElementById("count").textContent = list.length+" modèle"+(list.length>1?"s":"")+" à prix baissé";
-  document.getElementById("grid").innerHTML = list.map((p,i)=>(i===0||list[i-1].t!==p.t?`<h2 class="sec">${p.t==="promo"?"Promo":"Prix en baisse"}</h2>`:"")+`
+  document.getElementById("grid").innerHTML = list.map(p=>`
     <article class="card" data-ref="${p.ref}">
       <div class="img" style="background:${bg(p.colors[p.sel].c)}">${imgHTML(p)}</div>
       <div class="info">
