@@ -115,6 +115,8 @@
   .bar button.empty{background:var(--soft);color:var(--muted)}
   .ph h2{font-weight:500}
   .sec{grid-column:1/-1;font-family:"Bodoni Moda",Didot,Georgia,serif;font-weight:500;font-size:28px;margin:18px 0 0;padding-bottom:6px;border-bottom:1px solid var(--line)}
+  .vip{display:inline-block;margin-top:18px;font-size:11.5px;font-weight:700;letter-spacing:.16em;text-transform:uppercase;color:var(--red);border:1px solid var(--red);border-radius:999px;padding:5px 12px}
+  .vip+h1{margin-top:12px}
   .cl{font-weight:500;color:var(--muted);font-size:11.5px;line-height:1.35}
   .pinfo{font-size:13px;color:var(--muted);margin:10px 0 2px}
   .prow{display:flex;gap:12px;align-items:center;padding:10px 0;border-bottom:1px solid var(--line)}
@@ -128,7 +130,7 @@
 <body>
 <header>
   <div class="brand">C'MELODIE<small>PARIS · GROSSISTE GRANDES TAILLES</small></div>
-  <h1>Prix en baisse<br><span>jusqu'à -52 %</span></h1>
+  <div class="vip">Offre réservée à nos clients fidèles</div><h1>Prix en baisse<br><span>jusqu'à -52 %</span></h1>
   <div class="sub">Prix de gros HT · Grandes tailles</div>
   <div class="upd">Mis à jour le <b id="upd"></b></div>
 </header>
