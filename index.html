@@ -115,6 +115,13 @@
   .bar button.empty{background:var(--soft);color:var(--muted)}
   .ph h2{font-weight:500}
   .sec{grid-column:1/-1;font-family:"Bodoni Moda",Didot,Georgia,serif;font-weight:500;font-size:28px;margin:18px 0 0;padding-bottom:6px;border-bottom:1px solid var(--line)}
+  .cl{font-weight:500;color:var(--muted);font-size:11.5px;line-height:1.35}
+  .pinfo{font-size:13px;color:var(--muted);margin:10px 0 2px}
+  .prow{display:flex;gap:12px;align-items:center;padding:10px 0;border-bottom:1px solid var(--line)}
+  .prow img{width:46px;height:61px;object-fit:cover;border-radius:2px;flex:none;border:1px solid var(--line)}
+  .prow .t{flex:1;min-width:0}.prow .t b{display:block;font-size:14px}.prow .t small{font-size:12px;color:var(--muted)}.prow em{font-style:normal;color:var(--red);font-weight:600}
+  .qty button{width:38px;height:38px}
+  .okb{flex:1;border:0;background:var(--red);color:#fff;font:600 15px Manrope,sans-serif;padding:13px 0;border-radius:999px;cursor:pointer}
   .wa{border-radius:999px!important}.cp{border-radius:999px!important}
 </style>
 </head>
@@ -128,7 +135,7 @@
 
 <section class="how">
   <div><b>① Sur MC</b>Commandez directement dans MC : recherchez la référence (ex. <i>LS2252</i>).<span id="mcLink"></span></div>
-  <div><b>② Par WhatsApp</b>Touchez « Ajouter », puis envoyez-nous votre sélection en un clic.</div>
+  <div><b>② Par WhatsApp</b>Touchez « Commander », choisissez les coloris et les quantités, puis envoyez votre sélection en un clic.</div>
 </section>
 <nav class="chips" id="chips"></nav>
 <div class="count" id="count"></div>
@@ -237,7 +244,7 @@ function recapText(){
 }
 function renderSheet(){
   const L=lines(), el=document.getElementById("lines");
-  if(!L.length){el.innerHTML='<div class="emptymsg">Aucun article pour le moment.<br>Touchez « Ajouter » sur un modèle.</div>';}
+  if(!L.length){el.innerHTML='<div class="emptymsg">Aucun article pour le moment.<br>Touchez « Commander » sur un modèle.</div>';}
   else el.innerHTML = L.map(l=>`
     <div class="line"><span class="sq" style="background:${l.c.c}"></span>
       <div class="t"><b>${l.p.ref} · ${l.c.n}</b><small>${l.p.name} · ${l.pcs} pcs × ${eur(l.p.now)}</small></div>
@@ -285,6 +292,90 @@ function render(){
 }
 render(); updBar();
 document.getElementById("upd").textContent = new Date(UPDATED).toLocaleDateString("fr-FR",{day:"numeric",month:"long",year:"numeric"});
+</script>
+<script>
+// 加在 David 模板脚本之后（同一页面的全局变量：P, cart, LOW, pct, unit, eur, toast, updBar, render, key）
+// 1) 卡片默认显示封面图，点颜色圆点再看这个颜色
+// 2) 「Commander」→ 弹出这一款的所有颜色，每个颜色直接选数量（− / +），一次加好几种颜色
+P.forEach(function (p) { p.cov = true; });
+function un(p, n) { var u = unit(p); return n > 1 ? u : u.slice(0, -1); } // 1 pièce / 2 pièces // cov = 显示封面（模板还要用 p.sel，所以 sel 保持 0）
+
+function pick(ref, i) {
+  var p = P.find(function (x) { return x.ref === ref; }); p.sel = i; p.cov = false;
+  var card = document.querySelector('[data-ref="' + CSS.escape(ref) + '"]');
+  card.querySelector(".img").innerHTML = imgHTML(p);
+  card.querySelector(".cname").innerHTML = cnameHTML(p);
+  card.querySelectorAll(".dot").forEach(function (d, j) { d.classList.toggle("on", j === i); });
+}
+function imgHTML(p) {
+  var c = p.cov ? null : p.colors[p.sel];
+  var src = (c && c.img) || p.cover || (p.colors[0] && p.colors[0].img) || "";
+  return '<img src="' + src + '" alt="' + p.ref + '" loading="lazy"><span class="off">-' + pct(p) + ' %</span>' +
+    (c && c.s <= LOW ? '<span class="low">' + c.n + ' : plus que ' + c.s + ' ' + un(p, c.s) + ' !</span>' : "");
+}
+function cnameHTML(p) {
+  if (p.cov) return '<span class="cl">' + p.colors.map(function (c) { return c.n; }).join(" · ") + "</span>";
+  var c = p.colors[p.sel];
+  return c.n + (c.s <= LOW ? " · <em>stock limité</em>" : "");
+}
+function refQty(p) { return p.colors.reduce(function (t, c) { return t + (cart[key(p, c)] || 0); }, 0); }
+function btnState(p) {
+  var card = document.querySelector('[data-ref="' + CSS.escape(p.ref) + '"]'); if (!card) return;
+  var q = refQty(p), b = card.querySelector("button.btn"), u = p.pack > 1 ? "pack" : "pc";
+  b.classList.toggle("added", q > 0);
+  b.textContent = q ? "✓ " + q + " " + u + (q > 1 ? "s" : "") + " · modifier" : "Commander";
+}
+
+// ===== fenêtre « choisir les coloris » =====
+var pk = document.createElement("div");
+pk.className = "sheet"; pk.id = "pick";
+pk.innerHTML = '<div class="panel"><div class="ph"><h2 id="pkT"></h2><button class="x" type="button" aria-label="Fermer">×</button></div>' +
+  '<div class="pb" id="pkB"></div><div class="pf"><button type="button" class="okb" id="pkOk">Valider</button></div></div>';
+document.body.appendChild(pk);
+var pkRef = null, tmp = {};
+pk.addEventListener("click", function (e) { if (e.target === pk || e.target.classList.contains("x")) pk.classList.remove("open"); });
+
+function add(ref) {
+  var p = P.find(function (x) { return x.ref === ref; }); pkRef = ref; tmp = {};
+  p.colors.forEach(function (c) { tmp[c.n] = cart[key(p, c)] || 0; });
+  document.getElementById("pkT").textContent = p.ref;
+  drawPick(); pk.classList.add("open");
+}
+function drawPick() {
+  var p = P.find(function (x) { return x.ref === pkRef; }), u = p.pack > 1 ? "pack" : "pc";
+  var tot = 0, pcs = 0;
+  var rows = p.colors.map(function (c, i) {
+    var q = tmp[c.n]; tot += q * p.pack * p.now; pcs += q * p.pack;
+    return '<div class="prow"><img src="' + (c.img || p.cover || "") + '" alt="" loading="lazy">' +
+      '<div class="t"><b>' + c.n + '</b><small>' + (c.s <= LOW ? '<em>plus que ' + c.s + ' ' + un(p, c.s) + '</em>' : 'en stock') + '</small></div>' +
+      '<div class="qty"><button type="button" data-i="' + i + '" data-d="-1" aria-label="Moins">−</button><span>' + q + '</span>' +
+      '<button type="button" data-i="' + i + '" data-d="1" aria-label="Plus">+</button></div></div>';
+  }).join("");
+  document.getElementById("pkB").innerHTML =
+    '<p class="pinfo">' + (p.name ? p.name + " · " : "") + eur(p.now) + " HT / pièce" + (p.pack > 1 ? " · pack de " + p.pack : "") + "</p>" + rows +
+    '<div class="tot"><span>' + pcs + " pièces</span><b>" + eur(tot) + " HT</b></div>";
+  document.getElementById("pkOk").textContent = pcs ? "Valider (" + pcs + " pièces)" : "Valider";
+}
+document.getElementById("pkB").addEventListener("click", function (e) {
+  var b = e.target.closest("button[data-i]"); if (!b) return;
+  var p = P.find(function (x) { return x.ref === pkRef; }), c = p.colors[+b.dataset.i];
+  var v = tmp[c.n] + (+b.dataset.d);
+  if (v > c.s) { toast("Stock maximum atteint"); return; }
+  tmp[c.n] = Math.max(0, v); drawPick();
+});
+document.getElementById("pkOk").addEventListener("click", function () {
+  var p = P.find(function (x) { return x.ref === pkRef; });
+  p.colors.forEach(function (c) { var k = key(p, c); if (tmp[c.n] > 0) cart[k] = tmp[c.n]; else delete cart[k]; });
+  pk.classList.remove("open"); btnState(p); updBar();
+  toast(refQty(p) ? "Ajouté à ma sélection" : "Retiré de ma sélection");
+});
+
+var _render = render; // 显示封面时，颜色圆点都不标「选中」
+render = function () {
+  _render();
+  P.forEach(function (p) { if (!p.cov) return; var c = document.querySelector('[data-ref="' + CSS.escape(p.ref) + '"]'); if (c) c.querySelectorAll(".dot.on").forEach(function (d) { d.classList.remove("on"); }); });
+};
+render(); updBar();
 </script>
 </body>
 </html>
